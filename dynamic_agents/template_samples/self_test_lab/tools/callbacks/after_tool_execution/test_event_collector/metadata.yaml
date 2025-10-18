@@ -1,0 +1,3 @@
+name: test_event_collector
+label: "Coletor de eventos de teste"
+description: "Callback que registra metadados das execuções de ferramentas e agentes durante a sessão."

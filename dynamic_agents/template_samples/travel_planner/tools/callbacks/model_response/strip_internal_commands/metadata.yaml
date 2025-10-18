@@ -1,0 +1,26 @@
+version: 1
+metadata:
+  name: "strip_internal_commands"
+  description: >
+    Remove linhas iniciadas por comandos internos (@delegate, @tool) das
+    respostas exibidas ao usuario, garantindo que apenas o texto natural
+    permaneça visivel.
+  owner: "travel_planner"
+events:
+  - commands_sanitized:
+      description: "Emitido quando comandos internos sao removidos da resposta."
+      output_schema:
+        type: OBJECT
+        properties:
+          - stripped:
+              type: BOOLEAN
+callbacks:
+  - handle_model_response:
+      when: "model_response"
+      description: "Limpa comandos internos do payload apos a resposta do modelo."
+      output_schema:
+        type: OBJECT
+        properties:
+          - payload:
+              type: OBJECT
+              description: "Payload sem linhas de comando internas."

@@ -1,0 +1,44 @@
+version: 1
+metadata:
+  name: "Conversation Stream"
+  label: "Transcrição da Conversa"
+  description: >
+    Persists every model response emitted during the orchestration so that the
+    full conversation can be replayed or audited later.
+events:
+  - stream_updated:
+      description: "Triggered whenever a response is appended to the transcript."
+      output_schema:
+        type: OBJECT
+        properties:
+          - total_messages:
+              type: NUMBER
+              description: "Total amount of messages captured so far."
+callbacks:
+  - handle_model_response:
+      when: "*"
+      description: "Append events to the transcript regardless of the hook."
+      output_schema:
+        type: OBJECT
+        properties:
+          - transcript:
+              type: ARRAY
+              description: "Conversation transcript after appending the new message."
+    ref_events:
+      - stream_updated:
+          description: "Published after a message is written to the transcript."
+    usage:
+      instructions: >
+        Register this callback for the `after_model_response` event to create a
+        running transcript that can be stored in the state dictionary or an
+        external persistence layer.
+      samples:
+        - event:
+            name: "after_model_response"
+            data:
+              role: "assistant"
+              content: "Here is your trip plan."
+        - exception:
+            name: "TranscriptStorageError"
+            data:
+              message: "Unable to persist transcript"

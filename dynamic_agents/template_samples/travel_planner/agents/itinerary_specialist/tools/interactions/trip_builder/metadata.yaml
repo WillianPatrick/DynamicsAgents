@@ -1,0 +1,41 @@
+version: 1
+metadata:
+  name: "Trip Builder"
+  label: "Construtor de Itinerário"
+  description: >
+    Consumes intermediate travel search results and synthesizes a coherent
+    itinerary proposal for the traveler.
+  owner: "travel_planner"
+methods:
+  - compile_itinerary:
+      description: "Create a summarized itinerary using hotel, flight, and experience suggestions."
+      input_schema:
+        type: OBJECT
+        properties:
+          - traveler_name:
+              type: STRING
+              description: "Display name of the traveler. Defaults to the active profile name when omitted."
+              required: false
+          - preferences:
+              type: OBJECT
+              description: "Additional preferences captured during the conversation."
+              required: false
+      output_schema:
+        type: OBJECT
+        properties:
+          - summary:
+              type: STRING
+              description: "High level summary of the itinerary."
+          - recommended_plan:
+              type: OBJECT
+              description: "Structured representation of flights, hotels, and experiences."
+    usage:
+      instructions: >
+        Execute after running the search tools to consolidate suggestions in a
+        single artifact that can be presented to the user or persisted.
+      samples:
+        - call:
+            args:
+              traveler_name: "Maria"
+            result:
+              summary: "3-day getaway in Lisbon with direct flights and boutique hotel."

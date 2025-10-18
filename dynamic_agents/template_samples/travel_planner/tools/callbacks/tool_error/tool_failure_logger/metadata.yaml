@@ -1,0 +1,45 @@
+version: 1
+metadata:
+  name: "Tool Failure Logger"
+  description: >
+    Captures tool invocation failures and stores a concise audit entry in the
+    runtime state so incidents can be diagnosed quickly.
+events:
+  - failure_logged:
+      description: "Emitted when a tool execution fails."
+      output_schema:
+        type: OBJECT
+        properties:
+          - tool:
+              type: STRING
+              description: "Tool name that failed."
+          - method:
+              type: STRING
+              description: "Method name invoked on the tool."
+          - error:
+              type: STRING
+              description: "Exception message or error identifier."
+callbacks:
+  - capture_failure:
+      when: "tool_error"
+      description: "Persist failure details under the `_errors` key in the state."
+      output_schema:
+        type: OBJECT
+        properties:
+          - errors:
+              type: ARRAY
+              description: "List of errors captured so far."
+    ref_events:
+      - failure_logged:
+          description: "Published after storing the failure details."
+    usage:
+      instructions: >
+        Attach this callback to the `tool_error` event to maintain structured
+        telemetry for troubleshooting and downstream alerting.
+      samples:
+        - event:
+            name: "tool_error"
+            data:
+              tool: "web_travel_search"
+              method: "search_hotels"
+              error: "Timeout"

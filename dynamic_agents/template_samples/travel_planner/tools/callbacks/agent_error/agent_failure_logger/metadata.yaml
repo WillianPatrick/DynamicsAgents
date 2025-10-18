@@ -1,0 +1,39 @@
+version: 1
+metadata:
+  name: "Agent Failure Logger"
+  description: "Collects agent-level failures for diagnostics."
+events:
+  - agent_failure_recorded:
+      description: "Raised after recording an agent level failure."
+      output_schema:
+        type: OBJECT
+        properties:
+          - agent:
+              type: STRING
+              description: "Agent name."
+          - reason:
+              type: STRING
+              description: "Failure justification."
+callbacks:
+  - capture_agent_failure:
+      when: "agent_error"
+      description: "Store agent failures in the runtime state for auditing."
+      output_schema:
+        type: OBJECT
+        properties:
+          - agent_failures:
+              type: ARRAY
+              description: "Errors collected for the agent."
+    ref_events:
+      - agent_failure_recorded:
+          description: "Published after persisting a failure entry."
+    usage:
+      instructions: >
+        Attach to `agent_error` events to keep a structured log of issues that
+        arise while the agent runtime orchestrates complex flows.
+      samples:
+        - event:
+            name: "agent_error"
+            data:
+              agent: "travel_concierge"
+              reason: "LLM response exceeded token limits."

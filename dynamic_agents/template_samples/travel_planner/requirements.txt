@@ -1,0 +1,6 @@
+# Dependências necessárias para executar o template travel_planner
+# Inclui o runtime dynamic-agents e bibliotecas utilizadas pela engine Google ADK
+dynamic-agents
+google-adk>=1.14.1
+google-genai>=1.38.0
+pyyaml>=6.0
