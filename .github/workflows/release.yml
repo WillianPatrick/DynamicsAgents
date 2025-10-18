@@ -16,15 +16,27 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: Synchronize project version from tag
+        id: version
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" != "tag" ]]; then
+            echo "This workflow must be triggered from a tag." >&2
+            exit 1
+          fi
+          VERSION="${GITHUB_REF_NAME#v}"
+          python scripts/sync_version.py pyproject.toml "${VERSION}"
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
       - name: Install build dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install build
-          pip install .[yaml,develop]
+          pip install build twine
+          pip install ".[yaml,develop]"
       - name: Run test suite
         run: pytest --maxfail=1 --disable-warnings --cov=dynamic_agents --cov-report=xml
       - name: Build distribution
         run: python -m build
+      - name: Validate distribution metadata
+        run: twine check dist/*
       - name: Upload coverage
         uses: actions/upload-artifact@v4
         with:

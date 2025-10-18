@@ -6,6 +6,13 @@ bootstrap solutions that follow the same filesystem conventions and workflow
 catalog format.
 """
 
+from importlib import metadata as _importlib_metadata
+
+try:  # pragma: no cover - trivial metadata access
+    __version__ = _importlib_metadata.version("dynamic-agents")
+except _importlib_metadata.PackageNotFoundError:  # pragma: no cover - local dev install
+    __version__ = "0.0.0"
+
 from . import yaml_loader
 from .runtime import (
     AgentSpec,
@@ -46,6 +53,7 @@ from .runtime import (
 )
 
 __all__ = [
+    "__version__",
     "AgentSpec",
     "DynamicAgentRuntime",
     "EventRecorder",
