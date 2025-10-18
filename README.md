@@ -37,103 +37,89 @@ exemplos oficiais e copiando plugins padrão.
 
 ## Arquitetura Completa (Engine do DynamicFlow)
 
-## Visão Arquitetônica (C4 Model)
+## Visão Arquitetônica
 
-### Nível 1 — Contexto
+### Contexto Geral
 
 ```mermaid
-C4Context
-    title Dynamic Agents — Visão de Contexto
-    Person(usuario, "DevOps / Usuário Final", "Profissional que prepara os catálogos e executa fluxos multiagente.")
-    Person_Ext(plugin_author, "Autor de Plugins", "Implementa extensões de observabilidade e integrações.")
-    System(system, "Dynamic Agents Runtime", "Engine que interpreta catálogos declarativos e constrói times de agentes.")
-    System_Ext(adk, "Google Agents Development Kit", "Runtime oficial que hospeda a execução dos agentes.")
-    System_Ext(gemini, "Google Gemini / GenAI", "Modelos de IA invocados pelos agentes do ADK.")
-    System_Ext(external, "APIs externas", "Serviços consultados pelas ferramentas e callbacks declarados.")
-    Rel(usuario, system, "Configura workflows, instala samples e inicia execuções.")
-    Rel(plugin_author, system, "Publica plugins que consomem eventos do runtime.")
-    Rel(system, adk, "Entrega agentes ADK instanciados dinamicamente.")
-    Rel(adk, system, "Solicita resolução de agentes, ferramentas e callbacks.")
-    Rel(system, gemini, "Provisiona modelos e prompts para cada agente.")
-    Rel(system, external, "Ferramentas e callbacks consultam dados adicionais.")
+flowchart LR
+    usuario["DevOps / Usuário Final"] -->|Configura workflows e executa fluxos| runtime["Dynamic Agents Runtime"]
+    usuario -->|Instala samples| cli["CLI `dynamic-agents`"]
+    cli -->|Provisiona| workspace[(Workspace)]
+    runtime -->|Entregas dinâmicas de agentes| adk["Google Agents Development Kit"]
+    adk -->|Solicita resolução de agentes/tools| runtime
+    runtime -->|Prompts e modelos| gemini[(Google Gemini / GenAI)]
+    runtime -->|Ferramentas e callbacks invocam| external[(APIs externas)]
+    plugin_author["Autor de Plugins"] -->|Publica extensões| plugins["Plugins do Runtime"]
+    runtime -->|Eventos de execução| plugins
+    plugins -->|Telemetria/Integrações| external
 ```
 
-### Nível 2 — Contêineres
+### Estrutura de Contêineres
 
 ```mermaid
-C4Container
-    title Dynamic Agents — Visão de Contêineres
-    Person(usuario, "DevOps / Usuário Final")
-    System_Boundary(dynamic_agents, "Dynamic Agents") {
-        Container(cli, "CLI `dynamic-agents`", "Python", "Inicializa workspaces, copia plugins e samples oficiais.")
-        Container(engine, "Engine Runtime", "Python", "Carrega catálogos, constrói a hierarquia ADK e orquestra execuções.")
-        Container(plugins, "Runtime Plugins", "Python", "Coleção de extensões que escutam eventos da engine.")
-        Container(catalogs, "Catálogos & Recursos", "YAML + Python", "Arquivos `runtime.yaml`, `workflow.yaml`, agentes, ferramentas e callbacks de cada solução.")
-    }
-    System_Ext(adk, "Google ADK", "CLI/App")
-    System_Ext(filesystem, "Workspace", "Filesystem", "Estrutura de diretórios com soluções multiagente.")
-    System_Ext(gemini, "Google Gemini / GenAI", "APIs")
-    System_Ext(external, "APIs externas", "REST/GraphQL")
-    Rel(usuario, cli, "Provisiona workspace e instala exemplos.")
-    Rel(cli, catalogs, "Copia templates e plugins para o workspace.")
-    Rel(engine, catalogs, "Lê catálogos declarativos e módulos Python adjacentes.")
-    Rel(engine, plugins, "Registra e notifica eventos de execução.")
-    Rel(engine, adk, "Entrega app compatível com o ADK e recebe interações.")
-    Rel(adk, gemini, "Executa prompts e modelos configurados.")
-    Rel(engine, filesystem, "Persiste e recupera estado de sessão.")
-    Rel(plugins, filesystem, "Armazenam telemetria e artefatos opcionais.")
-    Rel(engine, external, "Ferramentas acessam recursos externos.")
+flowchart TB
+    subgraph DynamicAgents
+        cli["CLI `dynamic-agents`"]
+        engine["Engine Runtime"]
+        plugins["Plugins do Runtime"]
+        catalogs["Catálogos & Recursos"]
+    end
+
+    usuario["DevOps / Usuário"] --> cli
+    cli --> catalogs
+    engine --> catalogs
+    engine --> plugins
+    engine --> adk["Google ADK"]
+    adk --> gemini["Google Gemini / GenAI"]
+    engine --> workspace[(Workspace)]
+    plugins --> workspace
+    engine --> external[(APIs externas)]
 ```
 
-### Nível 3 — Componentes
+### Componentes Principais da Engine
 
 ```mermaid
-C4Component
-    title Dynamic Agents — Componentes Principais
-    Container_Boundary(engine, "Engine Runtime (dynamic_agents/runtime.py)") {
-        Component(runtime_api, "DynamicAgentRuntime", "Classe", "Fachada principal que descobre soluções e executa workflows.")
-        Component(workflow_discovery, "WorkflowDiscovery", "Classe", "Varre diretórios e localiza `workflow.yaml` / `runtime.yaml`.")
-        Component(descriptor_builder, "SolutionDescriptor", "Dataclass", "Representa soluções com agentes, ferramentas e callbacks normalizados.")
-        Component(solution_runtime, "SolutionRuntime", "Classe", "Executa steps, delega agentes e aciona ferramentas.")
-        Component(builder, "ADK App Builder", "Métodos `_build_*`", "Transforma descritores em agentes, tools e callbacks compatíveis com o ADK.")
-        Component(event_bus, "RuntimeEventBus", "Classe", "Orquestra a publicação de eventos e distribuição para plugins.")
-        Component(plugin_loader, "_load_runtime_plugins", "Função", "Instancia plugins internos e declarados pelo usuário.")
-        Component(state_registry, "GLOBAL_SESSION_REGISTRY", "Dict", "Armazena e compartilha estado de sessão entre invocações.")
-    }
-    Rel(runtime_api, workflow_discovery, "Descobre soluções disponíveis no workspace.")
-    Rel(runtime_api, descriptor_builder, "Constrói descritores a partir dos catálogos YAML.")
-    Rel(runtime_api, builder, "Converte descritores em componentes ADK.")
-    Rel(runtime_api, solution_runtime, "Entrega execução do workflow.")
-    Rel(solution_runtime, event_bus, "Emite eventos de passos, agentes e ferramentas.")
-    Rel(event_bus, plugin_loader, "Registra plugins carregados dinamicamente.")
-    Rel(event_bus, state_registry, "Compartilha estado e metadados de sessão.")
-    Rel(plugin_loader, runtime_api, "Disponibiliza plugins configurados via ambiente.")
+flowchart LR
+    subgraph Runtime Engine
+        runtime_api["DynamicAgentRuntime"]
+        discovery["WorkflowDiscovery"]
+        descriptor["SolutionDescriptor"]
+        solution_runtime["SolutionRuntime"]
+        builder["Construtores `_build_*`"]
+        event_bus["RuntimeEventBus"]
+        plugin_loader["_load_runtime_plugins"]
+        registry["GLOBAL_SESSION_REGISTRY"]
+    end
+
+    runtime_api --> discovery
+    runtime_api --> descriptor
+    runtime_api --> builder
+    runtime_api --> solution_runtime
+    solution_runtime --> event_bus
+    event_bus --> plugin_loader
+    event_bus --> registry
+    plugin_loader -.-> runtime_api
 ```
 
-### Nível 4 — Código e Fluxo de Execução
+### Fluxo Interno de Execução
 
 ```mermaid
-C4Component
-    title Dynamic Agents — Fluxo de Código Interno
-    Container_Boundary(code, "dynamic_agents/runtime.py") {
-        Component(run_method, "DynamicAgentRuntime.run()", "Método", "Recebe o payload, seleciona a solução e delega a execução.")
-        Component(discovery_method, "DynamicAgentRuntime._discover_solutions()", "Método", "Cataloga soluções disponíveis no diretório raiz.")
-        Component(get_solution_method, "DynamicAgentRuntime.get_solution()", "Método", "Recupera descritores e dispara `configure` quando necessário.")
-        Component(configure_method, "SolutionDescriptor.configure()", "Método", "Carrega `runtime.yaml`, `workflow.yaml` e normaliza agentes.")
-        Component(runtime_ctor, "SolutionRuntime.__init__", "Construtor", "Prepara estado de sessão e registra o barramento de eventos.")
-        Component(step_executor, "SolutionRuntime._execute_step()", "Método", "Coordena ferramentas, agentes e callbacks de cada passo.")
-        Component(tool_builder, "_build_interactive_tool()", "Função", "Encapsula ferramentas declaradas em implementações ADK.")
-        Component(event_emit, "RuntimeEventBus.emit()", "Método", "Notifica plugins registrados sobre eventos.")
-        Component(plugin_handler, "RuntimePlugin.handle_event()", "Método", "Processa telemetria e integrações externas.")
-    }
-    Rel(run_method, discovery_method, "Mantém cache de catálogos atualizados.")
-    Rel(run_method, get_solution_method, "Seleciona a solução ativa.")
-    Rel(get_solution_method, configure_method, "Normaliza catálogo quando ainda não configurado.")
-    Rel(run_method, runtime_ctor, "Instancia `SolutionRuntime` com estado compartilhado.")
-    Rel(runtime_ctor, step_executor, "Itera pelos passos do agente entrypoint.")
-    Rel(step_executor, tool_builder, "Transforma declarações em ferramentas executáveis.")
-    Rel(step_executor, event_emit, "Publica eventos `step.*`, `tool.*`, `agent.*`.")
-    Rel(event_emit, plugin_handler, "Entrega eventos para cada plugin habilitado.")
+sequenceDiagram
+    participant Runtime as DynamicAgentRuntime
+    participant Discovery as _discover_solutions
+    participant Descriptor as SolutionDescriptor
+    participant Solution as SolutionRuntime
+    participant Builder as _build_interactive_tool / _build_agent
+    participant Bus as RuntimeEventBus
+    participant Plugin as RuntimePlugin
+
+    Runtime->>Discovery: Atualiza cache de catálogos
+    Runtime->>Descriptor: configure()
+    Runtime->>Solution: Instancia sessão ativa
+    Solution->>Builder: Prepara agentes e ferramentas
+    Solution->>Bus: emit(step/agent/tool)
+    Bus->>Plugin: handle_event(...)
 ```
 
 ### Visão macro
@@ -382,50 +368,54 @@ pytest
   `dynamic-agents`, `google-adk>=1.14.1`, `google-genai>=1.38.0`,
   `pyyaml>=6.0`).
 
-#### C4 — Hierarquia completa do sample
+#### Hierarquia completa do sample
 
 ```mermaid
-C4Component
-    title travel_planner — Agentes, ferramentas, callbacks e recursos
-    Container_Boundary(travel_planner, "Sample travel_planner") {
-        Component(entrypoint, "agent.py", "Entrypoint", "Invoca `DynamicAgentRuntime.run()` com o workflow selecionado.")
-        Component(runtime_catalog, "runtime.yaml", "Catálogo", "Diretrizes de instrução e notas de handoff.")
-        Component(workflow_catalog, "workflow.yaml", "Workflow raiz", "Define agentes, passos, ferramentas e callbacks.")
-        Component(root_agent, "Agent travel_receptionist", "Agente raiz", "Orquestra o concierge de viagem.")
-        Component(flight_agent, "Agent flight_specialist", "Subagente", "Pesquisa voos e tarifas.")
-        Component(hotel_agent, "Agent hotel_specialist", "Subagente", "Seleciona hospedagens alinhadas ao orçamento.")
-        Component(tourism_agent, "Agent tourism_specialist", "Subagente", "Sugere experiências e passeios.")
-        Component(itinerary_agent, "Agent itinerary_specialist", "Subagente", "Consolida itinerário final e notas de viagem.")
-        Component(web_tool, "Tool web_travel_search", "Interactive Tool", "Métodos: search_flights, search_hotels, search_experiences.")
-        Component(trip_tool, "Tool trip_builder", "Interactive Tool", "Método: compile_itinerary (agente itinerary).")
-        Component(cb_conversation, "Callback conversation_stream", "model_response", "Transcreve conversas em cada passo.")
-        Component(cb_strip, "Callback strip_internal_commands", "model_response", "Remove comandos internos antes de registrar logs.")
-        Component(cb_agent_error, "Callback agent_failure_logger", "agent_error", "Registra falhas de agentes (recurso opcional).")
-        Component(cb_tool_error, "Callback tool_failure_logger", "tool_error", "Registra falhas de ferramentas (recurso opcional).")
-    }
-    Rel(entrypoint, root_agent, "Executa agente de entrada via runtime dinâmico.")
-    Rel(runtime_catalog, workflow_catalog, "Complementa instruções globais do workflow.")
-    Rel(workflow_catalog, root_agent, "Define passos `collect_profile` → `assemble_plan`.")
-    Rel(workflow_catalog, flight_agent, "Inclui `agents/flight_specialist/workflow.yaml` como subfluxo.")
-    Rel(workflow_catalog, hotel_agent, "Inclui `agents/hotel_specialist/workflow.yaml` como subfluxo.")
-    Rel(workflow_catalog, tourism_agent, "Inclui `agents/tourism_specialist/workflow.yaml` como subfluxo.")
-    Rel(workflow_catalog, itinerary_agent, "Inclui `agents/itinerary_specialist/workflow.yaml` como subfluxo.")
-    Rel(root_agent, flight_agent, "Delegação agent_transfer para buscas de voo.")
-    Rel(root_agent, hotel_agent, "Delegação agent_transfer para hospedagem.")
-    Rel(root_agent, tourism_agent, "Delegação agent_transfer para experiências.")
-    Rel(root_agent, itinerary_agent, "Delegação agent_transfer para consolidar plano.")
-    Rel(flight_agent, web_tool, "Invoca search_flights com estado compartilhado.")
-    Rel(hotel_agent, web_tool, "Invoca search_hotels conforme orçamento.")
-    Rel(tourism_agent, web_tool, "Invoca search_experiences alinhado às preferências.")
-    Rel(itinerary_agent, trip_tool, "Compila itinerário final com resultados agregados.")
-    Rel(root_agent, cb_conversation, "Callback padrão after_model_response em todos os passos.")
-    Rel(flight_agent, cb_conversation, "Callback padrão antes/depois das ferramentas declaradas.")
-    Rel(hotel_agent, cb_conversation, "Callback padrão antes/depois das ferramentas declaradas.")
-    Rel(tourism_agent, cb_conversation, "Callback padrão antes/depois das ferramentas declaradas.")
-    Rel(itinerary_agent, cb_conversation, "Callback padrão durante consolidação do plano.")
-    Rel(runtime_catalog, cb_strip, "Disponibiliza limpeza de comandos para observabilidade.")
-    Rel(runtime_catalog, cb_agent_error, "Disponibiliza hook de auditoria de erros de agente.")
-    Rel(runtime_catalog, cb_tool_error, "Disponibiliza hook de auditoria de erros de ferramenta.")
+flowchart TD
+    subgraph Catálogos
+        runtime_yaml["runtime.yaml"]
+        workflow_yaml["workflow.yaml"]
+    end
+
+    subgraph Agentes
+        travel_receptionist["Agente travel_receptionist"]
+        flight_specialist["Subagente flight_specialist"]
+        hotel_specialist["Subagente hotel_specialist"]
+        tourism_specialist["Subagente tourism_specialist"]
+        itinerary_specialist["Subagente itinerary_specialist"]
+    end
+
+    subgraph Ferramentas
+        web_travel_search["Tool web_travel_search"]
+        trip_builder["Tool trip_builder"]
+    end
+
+    subgraph Callbacks
+        conversation_stream["conversation_stream"]
+        strip_internal_commands["strip_internal_commands"]
+        agent_failure_logger["agent_failure_logger"]
+        tool_failure_logger["tool_failure_logger"]
+    end
+
+    agent_py["agent.py"] --> travel_receptionist
+    runtime_yaml --> workflow_yaml
+    workflow_yaml --> travel_receptionist
+    workflow_yaml --> flight_specialist
+    workflow_yaml --> hotel_specialist
+    workflow_yaml --> tourism_specialist
+    workflow_yaml --> itinerary_specialist
+    travel_receptionist --> flight_specialist
+    travel_receptionist --> hotel_specialist
+    travel_receptionist --> tourism_specialist
+    travel_receptionist --> itinerary_specialist
+    flight_specialist --> web_travel_search
+    hotel_specialist --> web_travel_search
+    tourism_specialist --> web_travel_search
+    itinerary_specialist --> trip_builder
+    travel_receptionist --> conversation_stream
+    travel_receptionist --> strip_internal_commands
+    travel_receptionist --> agent_failure_logger
+    travel_receptionist --> tool_failure_logger
 ```
 
 ```mermaid
@@ -452,33 +442,40 @@ sequenceDiagram
 - **Requisitos**: consulte `self_test_lab/requirements.txt` com o mesmo conjunto
   de dependências essenciais da engine.
 
-#### C4 — Hierarquia completa do sample
+#### Hierarquia completa do sample
 
 ```mermaid
-C4Component
-    title self_test_lab — Agentes, ferramentas, callbacks e recursos
-    Container_Boundary(self_test_lab, "Sample self_test_lab") {
-        Component(entrypoint, "agent.py", "Entrypoint", "Invoca `DynamicAgentRuntime.run()` para a solução de auto testes.")
-        Component(runtime_catalog, "runtime.yaml", "Catálogo", "Instrui síntese de prompts e notas de orquestração.")
-        Component(workflow_catalog, "workflow.yaml", "Workflow principal", "Define `test_conductor`, ferramentas e callbacks.")
-        Component(conductor, "Agent test_conductor", "Agente raiz", "Conduz a sessão de auto teste e coordena passos determinísticos.")
-        Component(spec_author, "Agent spec_author", "Subagente", "Refina critérios em asserts mensuráveis.")
-        Component(diagnostics, "Agent diagnostics_reviewer", "AgentTool", "Analisa falhas e propõe planos de ação.")
-        Component(state_notebook, "Tool state_notebook", "Interactive Tool", "Método: record_entry para checkpoints e memória.")
-        Component(scenario_tester, "Tool scenario_tester", "Interactive Tool", "Método: run_suite executa suítes declarativas.")
-        Component(callback_tester, "Callback test_event_collector", "after_tool_execution", "Captura telemetria de cada tool.")
-    }
-    Rel(entrypoint, conductor, "Executa agente raiz via runtime dinâmico.")
-    Rel(runtime_catalog, workflow_catalog, "Complementa instruções globais do laboratório.")
-    Rel(workflow_catalog, conductor, "Define passos `iniciar_sessao` → `encerrar_sessao`.")
-    Rel(workflow_catalog, spec_author, "Permite delegação agent_transfer durante planejamento de suítes.")
-    Rel(workflow_catalog, diagnostics, "Disponibiliza agente como ferramenta para diagnósticos.")
-    Rel(conductor, state_notebook, "Invoca record_entry para checkpoints, timeline e encerramento.")
-    Rel(conductor, scenario_tester, "Invoca run_suite com planos estruturados.")
-    Rel(conductor, spec_author, "Delegação agent_transfer quando critérios precisam de refinamento.")
-    Rel(conductor, diagnostics, "Invocação agent_tool quando suítes falham.")
-    Rel(conductor, callback_tester, "Callback after_tool_execution persistente em todos os passos com tools.")
-    Rel(runtime_catalog, callback_tester, "Expõe coletor padrão de telemetria determinística.")
+flowchart TD
+    subgraph Catálogos
+        st_runtime["runtime.yaml"]
+        st_workflow["workflow.yaml"]
+    end
+
+    subgraph Agentes
+        test_conductor["Agente test_conductor"]
+        spec_author["Subagente spec_author"]
+        diagnostics_reviewer["AgentTool diagnostics_reviewer"]
+    end
+
+    subgraph Ferramentas
+        state_notebook["Tool state_notebook"]
+        scenario_tester["Tool scenario_tester"]
+    end
+
+    subgraph Callbacks
+        test_event_collector["test_event_collector"]
+    end
+
+    st_agent_py["agent.py"] --> test_conductor
+    st_runtime --> st_workflow
+    st_workflow --> test_conductor
+    st_workflow --> spec_author
+    st_workflow --> diagnostics_reviewer
+    test_conductor --> spec_author
+    test_conductor --> diagnostics_reviewer
+    test_conductor --> state_notebook
+    test_conductor --> scenario_tester
+    test_conductor --> test_event_collector
 ```
 
 ## Contribuição
